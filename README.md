@@ -19,11 +19,11 @@ The app calculates the distance to the source
 
 ### Features
 
-🗺️ Interactive map with location search and geolocation
-🔄 Multiple measurements with color-coding for tracking different events
-💾 Remembers your position between visits
-📱 Works on both mobile and desktop
-🚫 No installation required - just a single HTML page
+- 🗺️ Interactive map with location search and geolocation
+- 🔄 Multiple measurements with color-coding for tracking different events
+- 💾 Remembers your position between visits
+- 📱 Works on both mobile and desktop
+- 🚫 No installation required - just a single HTML page
 
 ### Claude3.7
 
