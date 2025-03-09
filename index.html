@@ -23,6 +23,7 @@
                 margin: 0;
                 padding: 0;
                 font-family: Arial, sans-serif;
+                overflow: hidden;
             }
 
             #map {
@@ -40,6 +41,7 @@
                 max-width: 300px;
                 max-height: 80vh;
                 overflow-y: auto;
+                transition: transform 0.3s ease;
             }
 
             .instructions-panel {
@@ -81,6 +83,7 @@
                 border-radius: 4px;
                 cursor: pointer;
                 margin-top: 10px;
+                margin-right: 5px;
             }
 
             .button:hover,
@@ -92,6 +95,7 @@
                 margin-bottom: 15px;
                 display: flex;
                 align-items: center;
+                flex-wrap: wrap;
             }
 
             .location-buttons button {
@@ -102,6 +106,7 @@
                 border-radius: 4px;
                 cursor: pointer;
                 margin-right: 10px;
+                margin-bottom: 10px;
             }
 
             .spinner {
@@ -149,13 +154,97 @@
                 margin-right: 8px;
                 vertical-align: middle;
             }
+
+            /* Mobile-specific styles */
+            .panel-toggle {
+                position: fixed;
+                bottom: 20px;
+                width: 50px;
+                height: 50px;
+                background-color: white;
+                border-radius: 50%;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+                z-index: 1001;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                cursor: pointer;
+                font-size: 24px;
+                font-weight: bold;
+                transition: transform 0.3s ease;
+                color: #3388ff;
+            }
+
+            #instructions-toggle {
+                left: 20px;
+            }
+
+            #results-toggle {
+                right: 20px;
+            }
+
+            .panel-toggle:hover {
+                background-color: #f0f0f0;
+            }
+
+            /* Media queries for responsive design */
+            @media (max-width: 768px) {
+                .panel {
+                    max-width: 85%;
+                    max-height: 60vh;
+                }
+
+                .instructions-panel {
+                    transform: translateX(-110%);
+                    top: 15%;
+                    left: 0;
+                    border-radius: 0 5px 5px 0;
+                }
+
+                .results-panel {
+                    transform: translateX(110%);
+                    top: 15%;
+                    right: 0;
+                    border-radius: 5px 0 0 5px;
+                }
+
+                .show-panel {
+                    transform: translateX(0);
+                }
+            }
+
+            /* For very small screens */
+            @media (max-width: 480px) {
+                h2 {
+                    font-size: 18px;
+                }
+
+                .panel {
+                    padding: 10px;
+                    max-height: 70vh;
+                }
+
+                p {
+                    margin: 8px 0;
+                    font-size: 14px;
+                }
+
+                .button {
+                    padding: 6px 12px;
+                    font-size: 14px;
+                }
+            }
         </style>
     </head>
     <body>
         <div id="map"></div>
 
-        <div class="panel instructions-panel">
-            <h2>Thunder Distance Calculator by</h2>
+        <!-- Mobile toggle buttons -->
+        <div id="instructions-toggle" class="panel-toggle">i</div>
+        <div id="results-toggle" class="panel-toggle">R</div>
+
+        <div class="panel instructions-panel" id="instructions-panel">
+            <h2>Thunder Distance Calculator</h2>
             <h4>
                 Made with 🤖 by
                 <a href="https://about.luissilva.eu" target="_blank">ludeed</a>
@@ -193,15 +282,17 @@
                     position</small
                 >
             </p>
-            <button class="button" onclick="resetCalculator()">
-                Reset All
-            </button>
-            <button class="button" onclick="clearResults()">
-                Clear Results
-            </button>
+            <div>
+                <button class="button" onclick="resetCalculator()">
+                    Reset All
+                </button>
+                <button class="button" onclick="clearResults()">
+                    Clear Results
+                </button>
+            </div>
         </div>
 
-        <div class="panel results-panel">
+        <div class="panel results-panel" id="results-panel">
             <h2>Measurement Results</h2>
             <div id="results-list">
                 <p class="no-results">
@@ -233,10 +324,45 @@
             const EXPANSION_INTERVAL = 100; // Update circle every 100ms
             const STORAGE_KEY = "thunderCalculatorLastPosition";
 
+            // Mobile panel toggle functionality
+            document
+                .getElementById("instructions-toggle")
+                .addEventListener("click", function () {
+                    document
+                        .getElementById("instructions-panel")
+                        .classList.toggle("show-panel");
+                    document
+                        .getElementById("results-panel")
+                        .classList.remove("show-panel");
+                });
+
+            document
+                .getElementById("results-toggle")
+                .addEventListener("click", function () {
+                    document
+                        .getElementById("results-panel")
+                        .classList.toggle("show-panel");
+                    document
+                        .getElementById("instructions-panel")
+                        .classList.remove("show-panel");
+                });
+
+            // Close panels when clicking on map (mobile)
+            function closePanelsOnMobile() {
+                if (window.innerWidth <= 768) {
+                    document
+                        .getElementById("instructions-panel")
+                        .classList.remove("show-panel");
+                    document
+                        .getElementById("results-panel")
+                        .classList.remove("show-panel");
+                }
+            }
+
             // Initialize map
             function initMap() {
                 // Check for saved position
-                let initialView = [55.6761, 12.5683]; // Default (New York City)
+                let initialView = [55.6761, 12.5683]; // Default (Copenhagen)
                 let initialZoom = 13;
 
                 // Try to load last position from localStorage
@@ -262,6 +388,9 @@
                 // Add click handler
                 map.on("click", handleMapClick);
 
+                // Close panels when clicking on the map (mobile only)
+                map.on("click", closePanelsOnMobile);
+
                 // Add keyboard event listener for spacebar
                 document.addEventListener("keydown", function (e) {
                     if (e.code === "Space") {
@@ -282,6 +411,36 @@
                     setUserPosition(
                         L.latLng(savedPosition.lat, savedPosition.lng),
                     );
+                }
+
+                // Check if it's mobile and adjust the UI
+                checkMobileAndAdjustUI();
+
+                // Add resize listener to handle orientation changes
+                window.addEventListener("resize", checkMobileAndAdjustUI);
+            }
+
+            // Check if mobile and adjust UI accordingly
+            function checkMobileAndAdjustUI() {
+                const isMobile = window.innerWidth <= 768;
+                const instructionsPanel =
+                    document.getElementById("instructions-panel");
+                const resultsPanel = document.getElementById("results-panel");
+                const instructionsToggle = document.getElementById(
+                    "instructions-toggle",
+                );
+                const resultsToggle = document.getElementById("results-toggle");
+
+                if (isMobile) {
+                    instructionsToggle.classList.remove("hidden");
+                    resultsToggle.classList.remove("hidden");
+                    instructionsPanel.classList.remove("show-panel");
+                    resultsPanel.classList.remove("show-panel");
+                } else {
+                    instructionsToggle.classList.add("hidden");
+                    resultsToggle.classList.add("hidden");
+                    instructionsPanel.classList.add("show-panel");
+                    resultsPanel.classList.add("show-panel");
                 }
             }
 
@@ -309,6 +468,9 @@
                         // Hide spinner
                         spinner.classList.add("hidden");
                         button.disabled = false;
+
+                        // Close panels on mobile after finding location
+                        closePanelsOnMobile();
                     },
                     function (error) {
                         // Error
@@ -347,6 +509,9 @@
                             const lat = parseFloat(location.lat);
                             const lon = parseFloat(location.lon);
                             map.setView([lat, lon], 15);
+
+                            // Close panels on mobile after search
+                            closePanelsOnMobile();
                         } else {
                             alert(
                                 "Location not found. Please try a different search.",
@@ -405,6 +570,16 @@
                 } else {
                     // Second click - stop expansion and calculate distance
                     stopAndCalculate();
+
+                    // Show results panel on mobile when measurement completed
+                    if (window.innerWidth <= 768) {
+                        document
+                            .getElementById("results-panel")
+                            .classList.add("show-panel");
+                        document
+                            .getElementById("instructions-panel")
+                            .classList.remove("show-panel");
+                    }
                 }
             }
 
@@ -451,8 +626,8 @@
                             <span class="color-indicator" style="background-color: ${color.color};"></span>
                             Measurement at ${result.time}
                         </h4>
-                        <p>Time between lightning and thunder: ${result.timeElapsed.toFixed(2)} seconds</p>
-                        <p>Thunder distance: ${result.distance.toFixed(0)} meters (${(result.distance / 1000).toFixed(2)} km)</p>
+                        <p>Time: ${result.timeElapsed.toFixed(2)} seconds</p>
+                        <p>Distance: ${result.distance.toFixed(0)} m (${(result.distance / 1000).toFixed(2)} km)</p>
                         <button class="button" onclick="removeResult(${result.id})">Remove</button>
                     </div>
                 `;
@@ -547,6 +722,9 @@
 
                 // Start animation
                 animateCircle();
+
+                // Close panels on mobile when starting measurement
+                closePanelsOnMobile();
             }
 
             // Animate the expanding circle
@@ -600,6 +778,9 @@
 
                 // Clear results
                 clearResults();
+
+                // Close panels on mobile
+                closePanelsOnMobile();
             }
 
             // Initialize map when page loads
