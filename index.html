@@ -1,540 +1,603 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thunder Distance Calculator</title>
-    
-    <!-- Leaflet CSS and JS -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-    
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-        }
-        
-        #map {
-            width: 100%;
-            height: 100vh;
-        }
-        
-        .panel {
-            position: absolute;
-            z-index: 1000;
-            background-color: white;
-            padding: 15px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-            max-width: 300px;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        
-        .instructions-panel {
-            top: 10px;
-            left: 10px;
-        }
-        
-        .results-panel {
-            top: 10px;
-            right: 10px;
-        }
-        
-        .search-box {
-            margin-bottom: 15px;
-            display: flex;
-        }
-        
-        .search-box input {
-            flex-grow: 1;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px 0 0 4px;
-        }
-        
-        .search-box button {
-            padding: 8px 12px;
-            background-color: #3388ff;
-            color: white;
-            border: none;
-            border-radius: 0 4px 4px 0;
-            cursor: pointer;
-        }
-        
-        .button {
-            padding: 8px 16px;
-            background-color: #3388ff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-        
-        .button:hover, .search-box button:hover {
-            background-color: #2266dd;
-        }
-        
-        .location-buttons {
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-        }
-        
-        .location-buttons button {
-            padding: 8px 12px;
-            background-color: #3388ff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-        
-        .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(0, 0, 0, 0.1);
-            border-radius: 50%;
-            border-top-color: #3388ff;
-            animation: spin 1s ease-in-out infinite;
-        }
-        
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Thunder Distance Calculator</title>
+
+        <!-- Leaflet CSS and JS -->
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+        />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                font-family: Arial, sans-serif;
             }
-        }
-        
-        .hidden {
-            display: none;
-        }
-        
-        .circle-history {
-            position: absolute;
-            opacity: 0.5;
-        }
-        
-        .result-item {
-            border-left: 4px solid #ccc;
-            padding: 10px;
-            margin-bottom: 15px;
-            background-color: #f9f9f9;
-        }
-        
-        .result-item h4 {
-            margin-top: 0;
-            margin-bottom: 8px;
-        }
-        
-        .color-indicator {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            margin-right: 8px;
-            vertical-align: middle;
-        }
-    </style>
-</head>
-<body>
-    <div id="map"></div>
-    
-    <div class="panel instructions-panel">
-        <h2>Thunder Distance Calculator</h2>
-        <div class="search-box">
-            <input id="location-search" type="text" placeholder="Search location...">
-            <button onclick="searchLocation()">Search</button>
-        </div>
-        <div class="location-buttons">
-            <button id="geolocate-btn" onclick="getUserLocation()">Find My Location</button>
-            <span id="loading-spinner" class="spinner hidden"></span>
-        </div>
-        <h3>Instructions:</h3>
-        <p>1. Click on the map to mark your position (when you see lightning)</p>
-        <p>2. The circle will expand at the speed of sound (343 m/s)</p>
-        <p>3. Click again when you hear thunder to stop expansion</p>
-        <p><small>You can also press SPACE or click your marker to stop</small></p>
-        <p><small>Press SPACE again to start a new measurement from the same position</small></p>
-        <button class="button" onclick="resetCalculator()">Reset All</button>
-        <button class="button" onclick="clearResults()">Clear Results</button>
-    </div>
-    
-    <div class="panel results-panel">
-        <h2>Measurement Results</h2>
-        <div id="results-list">
-            <p class="no-results">No measurements yet. Start by clicking on the map.</p>
-        </div>
-    </div>
-    
-    <script>
-        // Initialize variables
-        let map;
-        let userMarker;
-        let soundCircle;
-        let startTime;
-        let animationId;
-        let userPosition;
-        let expanding = false;
-        let pastCircles = [];
-        let measurementResults = [];
-        let circleColors = [
-            { color: '#ff6600', fillColor: '#ff9900' }, // Orange (default)
-            { color: '#ff3333', fillColor: '#ff6666' }, // Red
-            { color: '#3366ff', fillColor: '#6699ff' }, // Blue
-            { color: '#33cc33', fillColor: '#66ff66' }, // Green
-            { color: '#9933cc', fillColor: '#cc66ff' }  // Purple
-        ];
-        let colorIndex = 0;
-        const SOUND_SPEED = 343; // Speed of sound in m/s
-        const EXPANSION_INTERVAL = 100; // Update circle every 100ms
-        const STORAGE_KEY = 'thunderCalculatorLastPosition';
-        
-        // Initialize map
-        function initMap() {
-            // Check for saved position
-            let initialView = [40.7128, -74.0060]; // Default (New York City)
-            let initialZoom = 13;
-            
-            // Try to load last position from localStorage
-            const savedPosition = loadLastPosition();
-            if (savedPosition) {
-                initialView = [savedPosition.lat, savedPosition.lng];
-                initialZoom = 15;
+
+            #map {
+                width: 100%;
+                height: 100vh;
             }
-            
-            // Create map centered on initial location
-            map = L.map('map').setView(initialView, initialZoom);
-            
-            // Add OpenStreetMap tiles
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
-            
-            // Add click handler
-            map.on('click', handleMapClick);
-            
-            // Add keyboard event listener for spacebar
-            document.addEventListener('keydown', function(e) {
-                if (e.code === 'Space') {
-                    e.preventDefault(); // Prevent page scroll
-                    
-                    if (expanding) {
-                        // If circle is expanding, stop it
-                        stopAndCalculate();
-                    } else if (userPosition) {
-                        // If not expanding but we have a position, start a new circle
-                        startExpanding();
-                    }
+
+            .panel {
+                position: absolute;
+                z-index: 1000;
+                background-color: white;
+                padding: 15px;
+                border-radius: 5px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+                max-width: 300px;
+                max-height: 80vh;
+                overflow-y: auto;
+            }
+
+            .instructions-panel {
+                top: 10px;
+                left: 10px;
+            }
+
+            .results-panel {
+                top: 10px;
+                right: 10px;
+            }
+
+            .search-box {
+                margin-bottom: 15px;
+                display: flex;
+            }
+
+            .search-box input {
+                flex-grow: 1;
+                padding: 8px;
+                border: 1px solid #ccc;
+                border-radius: 4px 0 0 4px;
+            }
+
+            .search-box button {
+                padding: 8px 12px;
+                background-color: #3388ff;
+                color: white;
+                border: none;
+                border-radius: 0 4px 4px 0;
+                cursor: pointer;
+            }
+
+            .button {
+                padding: 8px 16px;
+                background-color: #3388ff;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-top: 10px;
+            }
+
+            .button:hover,
+            .search-box button:hover {
+                background-color: #2266dd;
+            }
+
+            .location-buttons {
+                margin-bottom: 15px;
+                display: flex;
+                align-items: center;
+            }
+
+            .location-buttons button {
+                padding: 8px 12px;
+                background-color: #3388ff;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-right: 10px;
+            }
+
+            .spinner {
+                display: inline-block;
+                width: 20px;
+                height: 20px;
+                border: 3px solid rgba(0, 0, 0, 0.1);
+                border-radius: 50%;
+                border-top-color: #3388ff;
+                animation: spin 1s ease-in-out infinite;
+            }
+
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
                 }
-            });
-            
-            // If we have a saved position, create a marker
-            if (savedPosition) {
-                setUserPosition(L.latLng(savedPosition.lat, savedPosition.lng));
             }
-        }
-        
-        // Get user's location with button click
-        function getUserLocation() {
-            if (!navigator.geolocation) {
-                alert('Geolocation is not supported by your browser');
-                return;
+
+            .hidden {
+                display: none;
             }
-            
-            // Show loading spinner
-            const spinner = document.getElementById('loading-spinner');
-            const button = document.getElementById('geolocate-btn');
-            
-            spinner.classList.remove('hidden');
-            button.disabled = true;
-            
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    // Success
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    map.setView([lat, lng], 15);
-                    
-                    // Hide spinner
-                    spinner.classList.add('hidden');
-                    button.disabled = false;
-                },
-                function(error) {
-                    // Error
-                    console.warn("Error getting location:", error.message);
-                    alert('Unable to retrieve your location. Error: ' + error.message);
-                    
-                    // Hide spinner
-                    spinner.classList.add('hidden');
-                    button.disabled = false;
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
+
+            .circle-history {
+                position: absolute;
+                opacity: 0.5;
+            }
+
+            .result-item {
+                border-left: 4px solid #ccc;
+                padding: 10px;
+                margin-bottom: 15px;
+                background-color: #f9f9f9;
+            }
+
+            .result-item h4 {
+                margin-top: 0;
+                margin-bottom: 8px;
+            }
+
+            .color-indicator {
+                display: inline-block;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                margin-right: 8px;
+                vertical-align: middle;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+
+        <div class="panel instructions-panel">
+            <h2>Thuner Distance Calculator by</h2>
+            <h4>
+                Made with 🤖 by
+                <a href="https://about.luissilva.eu" target="_blank">ludeed</a>
+            </h4>
+            <div class="search-box">
+                <input
+                    id="location-search"
+                    type="text"
+                    placeholder="Search location..."
+                />
+                <button onclick="searchLocation()">Search</button>
+            </div>
+            <div class="location-buttons">
+                <button id="geolocate-btn" onclick="getUserLocation()">
+                    Find My Location
+                </button>
+                <span id="loading-spinner" class="spinner hidden"></span>
+            </div>
+            <h3>Instructions:</h3>
+            <p>
+                1. Click on the map to mark your position (when you see
+                lightning)
+            </p>
+            <p>2. The circle will expand at the speed of sound (343 m/s)</p>
+            <p>3. Click again when you hear thunder to stop expansion</p>
+            <p>
+                <small
+                    >You can also press SPACE or click your marker to
+                    stop</small
+                >
+            </p>
+            <p>
+                <small
+                    >Press SPACE again to start a new measurement from the same
+                    position</small
+                >
+            </p>
+            <button class="button" onclick="resetCalculator()">
+                Reset All
+            </button>
+            <button class="button" onclick="clearResults()">
+                Clear Results
+            </button>
+        </div>
+
+        <div class="panel results-panel">
+            <h2>Measurement Results</h2>
+            <div id="results-list">
+                <p class="no-results">
+                    No measurements yet. Start by clicking on the map.
+                </p>
+            </div>
+        </div>
+
+        <script>
+            // Initialize variables
+            let map;
+            let userMarker;
+            let soundCircle;
+            let startTime;
+            let animationId;
+            let userPosition;
+            let expanding = false;
+            let pastCircles = [];
+            let measurementResults = [];
+            let circleColors = [
+                { color: "#ff6600", fillColor: "#ff9900" }, // Orange (default)
+                { color: "#ff3333", fillColor: "#ff6666" }, // Red
+                { color: "#3366ff", fillColor: "#6699ff" }, // Blue
+                { color: "#33cc33", fillColor: "#66ff66" }, // Green
+                { color: "#9933cc", fillColor: "#cc66ff" }, // Purple
+            ];
+            let colorIndex = 0;
+            const SOUND_SPEED = 343; // Speed of sound in m/s
+            const EXPANSION_INTERVAL = 100; // Update circle every 100ms
+            const STORAGE_KEY = "thunderCalculatorLastPosition";
+
+            // Initialize map
+            function initMap() {
+                // Check for saved position
+                let initialView = [55.6761, 12.5683]; // Default (New York City)
+                let initialZoom = 13;
+
+                // Try to load last position from localStorage
+                const savedPosition = loadLastPosition();
+                if (savedPosition) {
+                    initialView = [savedPosition.lat, savedPosition.lng];
+                    initialZoom = 15;
                 }
-            );
-        }
-        
-        // Search for a location
-        function searchLocation() {
-            const searchInput = document.getElementById('location-search').value;
-            if (!searchInput) return;
-            
-            // Using OpenStreetMap Nominatim API for geocoding
-            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchInput)}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.length > 0) {
-                        const location = data[0];
-                        const lat = parseFloat(location.lat);
-                        const lon = parseFloat(location.lon);
-                        map.setView([lat, lon], 15);
-                    } else {
-                        alert('Location not found. Please try a different search.');
+
+                // Create map centered on initial location
+                map = L.map("map").setView(initialView, initialZoom);
+
+                // Add OpenStreetMap tiles
+                L.tileLayer(
+                    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    {
+                        maxZoom: 19,
+                        attribution:
+                            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    },
+                ).addTo(map);
+
+                // Add click handler
+                map.on("click", handleMapClick);
+
+                // Add keyboard event listener for spacebar
+                document.addEventListener("keydown", function (e) {
+                    if (e.code === "Space") {
+                        e.preventDefault(); // Prevent page scroll
+
+                        if (expanding) {
+                            // If circle is expanding, stop it
+                            stopAndCalculate();
+                        } else if (userPosition) {
+                            // If not expanding but we have a position, start a new circle
+                            startExpanding();
+                        }
                     }
-                })
-                .catch(error => {
-                    console.error('Error searching location:', error);
-                    alert('Error searching for location. Please try again.');
                 });
-        }
-        
-        // Save position to localStorage
-        function saveLastPosition(latlng) {
-            try {
-                const positionData = {
-                    lat: latlng.lat,
-                    lng: latlng.lng
-                };
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(positionData));
-            } catch (error) {
-                console.warn('Failed to save position to localStorage:', error);
-            }
-        }
-        
-        // Load position from localStorage
-        function loadLastPosition() {
-            try {
-                const savedData = localStorage.getItem(STORAGE_KEY);
-                if (savedData) {
-                    return JSON.parse(savedData);
+
+                // If we have a saved position, create a marker
+                if (savedPosition) {
+                    setUserPosition(
+                        L.latLng(savedPosition.lat, savedPosition.lng),
+                    );
                 }
-            } catch (error) {
-                console.warn('Failed to load position from localStorage:', error);
             }
-            return null;
-        }
-        
-        // Handle map clicks
-        function handleMapClick(e) {
-            if (!expanding) {
-                // First click - set user position and start expanding circle
-                setUserPosition(e.latlng);
-                startExpanding();
-            } else {
-                // Second click - stop expansion and calculate distance
-                stopAndCalculate();
+
+            // Get user's location with button click
+            function getUserLocation() {
+                if (!navigator.geolocation) {
+                    alert("Geolocation is not supported by your browser");
+                    return;
+                }
+
+                // Show loading spinner
+                const spinner = document.getElementById("loading-spinner");
+                const button = document.getElementById("geolocate-btn");
+
+                spinner.classList.remove("hidden");
+                button.disabled = true;
+
+                navigator.geolocation.getCurrentPosition(
+                    function (position) {
+                        // Success
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        map.setView([lat, lng], 15);
+
+                        // Hide spinner
+                        spinner.classList.add("hidden");
+                        button.disabled = false;
+                    },
+                    function (error) {
+                        // Error
+                        console.warn("Error getting location:", error.message);
+                        alert(
+                            "Unable to retrieve your location. Error: " +
+                                error.message,
+                        );
+
+                        // Hide spinner
+                        spinner.classList.add("hidden");
+                        button.disabled = false;
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0,
+                    },
+                );
             }
-        }
-        
-        // Stop expansion and calculate distance
-        function stopAndCalculate() {
-            stopExpanding();
-            
-            // Calculate approximate thunder location
-            const timeElapsed = (Date.now() - startTime) / 1000; // in seconds
-            const distance = SOUND_SPEED * timeElapsed; // in meters
-            
-            // Create result object
-            const result = {
-                id: Date.now(),
-                time: new Date().toLocaleTimeString(),
-                timeElapsed: timeElapsed,
-                distance: distance,
-                colorIndex: colorIndex
-            };
-            
-            // Add to results array
-            measurementResults.unshift(result); // Add to beginning for newest first
-            
-            // Update results display
-            updateResultsList();
-        }
-        
-        // Update the results list display
-        function updateResultsList() {
-            const resultsListEl = document.getElementById('results-list');
-            
-            if (measurementResults.length === 0) {
-                resultsListEl.innerHTML = '<p class="no-results">No measurements yet. Start by clicking on the map.</p>';
-                return;
+
+            // Search for a location
+            function searchLocation() {
+                const searchInput =
+                    document.getElementById("location-search").value;
+                if (!searchInput) return;
+
+                // Using OpenStreetMap Nominatim API for geocoding
+                fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchInput)}`,
+                )
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (data && data.length > 0) {
+                            const location = data[0];
+                            const lat = parseFloat(location.lat);
+                            const lon = parseFloat(location.lon);
+                            map.setView([lat, lon], 15);
+                        } else {
+                            alert(
+                                "Location not found. Please try a different search.",
+                            );
+                        }
+                    })
+                    .catch((error) => {
+                        console.error("Error searching location:", error);
+                        alert(
+                            "Error searching for location. Please try again.",
+                        );
+                    });
             }
-            
-            let html = '';
-            measurementResults.forEach(result => {
-                const color = circleColors[result.colorIndex];
-                html += `
+
+            // Save position to localStorage
+            function saveLastPosition(latlng) {
+                try {
+                    const positionData = {
+                        lat: latlng.lat,
+                        lng: latlng.lng,
+                    };
+                    localStorage.setItem(
+                        STORAGE_KEY,
+                        JSON.stringify(positionData),
+                    );
+                } catch (error) {
+                    console.warn(
+                        "Failed to save position to localStorage:",
+                        error,
+                    );
+                }
+            }
+
+            // Load position from localStorage
+            function loadLastPosition() {
+                try {
+                    const savedData = localStorage.getItem(STORAGE_KEY);
+                    if (savedData) {
+                        return JSON.parse(savedData);
+                    }
+                } catch (error) {
+                    console.warn(
+                        "Failed to load position from localStorage:",
+                        error,
+                    );
+                }
+                return null;
+            }
+
+            // Handle map clicks
+            function handleMapClick(e) {
+                if (!expanding) {
+                    // First click - set user position and start expanding circle
+                    setUserPosition(e.latlng);
+                    startExpanding();
+                } else {
+                    // Second click - stop expansion and calculate distance
+                    stopAndCalculate();
+                }
+            }
+
+            // Stop expansion and calculate distance
+            function stopAndCalculate() {
+                stopExpanding();
+
+                // Calculate approximate thunder location
+                const timeElapsed = (Date.now() - startTime) / 1000; // in seconds
+                const distance = SOUND_SPEED * timeElapsed; // in meters
+
+                // Create result object
+                const result = {
+                    id: Date.now(),
+                    time: new Date().toLocaleTimeString(),
+                    timeElapsed: timeElapsed,
+                    distance: distance,
+                    colorIndex: colorIndex,
+                };
+
+                // Add to results array
+                measurementResults.unshift(result); // Add to beginning for newest first
+
+                // Update results display
+                updateResultsList();
+            }
+
+            // Update the results list display
+            function updateResultsList() {
+                const resultsListEl = document.getElementById("results-list");
+
+                if (measurementResults.length === 0) {
+                    resultsListEl.innerHTML =
+                        '<p class="no-results">No measurements yet. Start by clicking on the map.</p>';
+                    return;
+                }
+
+                let html = "";
+                measurementResults.forEach((result) => {
+                    const color = circleColors[result.colorIndex];
+                    html += `
                     <div class="result-item">
                         <h4>
                             <span class="color-indicator" style="background-color: ${color.color};"></span>
                             Measurement at ${result.time}
                         </h4>
                         <p>Time between lightning and thunder: ${result.timeElapsed.toFixed(2)} seconds</p>
-                        <p>Thunder distance: ${result.distance.toFixed(0)} meters (${(result.distance/1000).toFixed(2)} km)</p>
+                        <p>Thunder distance: ${result.distance.toFixed(0)} meters (${(result.distance / 1000).toFixed(2)} km)</p>
                         <button class="button" onclick="removeResult(${result.id})">Remove</button>
                     </div>
                 `;
-            });
-            
-            resultsListEl.innerHTML = html;
-        }
-        
-        // Remove a specific result
-        function removeResult(id) {
-            // Find the index of the result with the given id
-            const index = measurementResults.findIndex(result => result.id === id);
-            
-            if (index !== -1) {
-                // Remove from the array
-                measurementResults.splice(index, 1);
-                
-                // Update the display
+                });
+
+                resultsListEl.innerHTML = html;
+            }
+
+            // Remove a specific result
+            function removeResult(id) {
+                // Find the index of the result with the given id
+                const index = measurementResults.findIndex(
+                    (result) => result.id === id,
+                );
+
+                if (index !== -1) {
+                    // Remove from the array
+                    measurementResults.splice(index, 1);
+
+                    // Update the display
+                    updateResultsList();
+                }
+            }
+
+            // Clear all results
+            function clearResults() {
+                measurementResults = [];
                 updateResultsList();
             }
-        }
-        
-        // Clear all results
-        function clearResults() {
-            measurementResults = [];
-            updateResultsList();
-        }
-        
-        // Set user position and add marker
-        function setUserPosition(latlng) {
-            userPosition = latlng;
-            
-            // Save position to localStorage
-            saveLastPosition(latlng);
-            
-            // Remove existing marker if present
-            if (userMarker) {
-                map.removeLayer(userMarker);
-            }
-            
-            // Add new marker with click handler
-            userMarker = L.marker(latlng).addTo(map);
-            userMarker.bindPopup("Your Position (Lightning Seen)").openPopup();
-            
-            // Add click handler to marker
-            userMarker.on('click', function() {
-                if (expanding) {
-                    stopAndCalculate();
-                } else if (userPosition) {
-                    // If not expanding but we have the marker, start a new circle
-                    startExpanding();
+
+            // Set user position and add marker
+            function setUserPosition(latlng) {
+                userPosition = latlng;
+
+                // Save position to localStorage
+                saveLastPosition(latlng);
+
+                // Remove existing marker if present
+                if (userMarker) {
+                    map.removeLayer(userMarker);
                 }
-            });
-        }
-        
-        // Start expanding the circle
-        function startExpanding() {
-            // If we have an existing circle that was stopped, keep it as a ghost
-            if (soundCircle && !expanding) {
-                // Move current circle to past circles
-                soundCircle.setStyle({
-                    className: 'circle-history'
+
+                // Add new marker with click handler
+                userMarker = L.marker(latlng).addTo(map);
+                userMarker
+                    .bindPopup("Your Position (Lightning Seen)")
+                    .openPopup();
+
+                // Add click handler to marker
+                userMarker.on("click", function () {
+                    if (expanding) {
+                        stopAndCalculate();
+                    } else if (userPosition) {
+                        // If not expanding but we have the marker, start a new circle
+                        startExpanding();
+                    }
                 });
-                pastCircles.push(soundCircle);
-                
-                // Limit the number of past circles to display (keep last 5)
-                if (pastCircles.length > 5) {
-                    const oldestCircle = pastCircles.shift();
-                    map.removeLayer(oldestCircle);
+            }
+
+            // Start expanding the circle
+            function startExpanding() {
+                // If we have an existing circle that was stopped, keep it as a ghost
+                if (soundCircle && !expanding) {
+                    // Move current circle to past circles
+                    soundCircle.setStyle({
+                        className: "circle-history",
+                    });
+                    pastCircles.push(soundCircle);
+
+                    // Limit the number of past circles to display (keep last 5)
+                    if (pastCircles.length > 5) {
+                        const oldestCircle = pastCircles.shift();
+                        map.removeLayer(oldestCircle);
+                    }
                 }
+
+                // Cycle to next color
+                colorIndex = (colorIndex + 1) % circleColors.length;
+                const currentColor = circleColors[colorIndex];
+
+                // Initialize circle with 0 radius
+                soundCircle = L.circle(userPosition, {
+                    radius: 0,
+                    color: currentColor.color,
+                    fillColor: currentColor.fillColor,
+                    fillOpacity: 0.3,
+                }).addTo(map);
+
+                // Set start time and status
+                startTime = Date.now();
+                expanding = true;
+
+                // Start animation
+                animateCircle();
             }
-            
-            // Cycle to next color
-            colorIndex = (colorIndex + 1) % circleColors.length;
-            const currentColor = circleColors[colorIndex];
-            
-            // Initialize circle with 0 radius
-            soundCircle = L.circle(userPosition, {
-                radius: 0,
-                color: currentColor.color,
-                fillColor: currentColor.fillColor,
-                fillOpacity: 0.3
-            }).addTo(map);
-            
-            // Set start time and status
-            startTime = Date.now();
-            expanding = true;
-            
-            // Start animation
-            animateCircle();
-        }
-        
-        // Animate the expanding circle
-        function animateCircle() {
-            const currentTime = Date.now();
-            const elapsedSeconds = (currentTime - startTime) / 1000;
-            const radius = SOUND_SPEED * elapsedSeconds; // meters
-            
-            // Update circle radius
-            soundCircle.setRadius(radius);
-            
-            // Continue animation
-            animationId = requestAnimationFrame(animateCircle);
-        }
-        
-        // Stop the expansion
-        function stopExpanding() {
-            cancelAnimationFrame(animationId);
-            expanding = false;
-        }
-        
-        // Reset the calculator
-        function resetCalculator() {
-            // Stop expansion if in progress
-            if (expanding) {
-                stopExpanding();
+
+            // Animate the expanding circle
+            function animateCircle() {
+                const currentTime = Date.now();
+                const elapsedSeconds = (currentTime - startTime) / 1000;
+                const radius = SOUND_SPEED * elapsedSeconds; // meters
+
+                // Update circle radius
+                soundCircle.setRadius(radius);
+
+                // Continue animation
+                animationId = requestAnimationFrame(animateCircle);
             }
-            
-            // Clear markers and circles
-            if (userMarker) {
-                map.removeLayer(userMarker);
-                userMarker = null;
+
+            // Stop the expansion
+            function stopExpanding() {
+                cancelAnimationFrame(animationId);
+                expanding = false;
             }
-            
-            if (soundCircle) {
-                map.removeLayer(soundCircle);
-                soundCircle = null;
+
+            // Reset the calculator
+            function resetCalculator() {
+                // Stop expansion if in progress
+                if (expanding) {
+                    stopExpanding();
+                }
+
+                // Clear markers and circles
+                if (userMarker) {
+                    map.removeLayer(userMarker);
+                    userMarker = null;
+                }
+
+                if (soundCircle) {
+                    map.removeLayer(soundCircle);
+                    soundCircle = null;
+                }
+
+                // Clear past circles
+                pastCircles.forEach((circle) => {
+                    map.removeLayer(circle);
+                });
+                pastCircles = [];
+
+                // Reset color index
+                colorIndex = 0;
+
+                // Clear user position
+                userPosition = null;
+
+                // Clear results
+                clearResults();
             }
-            
-            // Clear past circles
-            pastCircles.forEach(circle => {
-                map.removeLayer(circle);
-            });
-            pastCircles = [];
-            
-            // Reset color index
-            colorIndex = 0;
-            
-            // Clear user position
-            userPosition = null;
-            
-            // Clear results
-            clearResults();
-        }
-        
-        // Initialize map when page loads
-        window.onload = initMap;
-    </script>
-</body>
+
+            // Initialize map when page loads
+            window.onload = initMap;
+        </script>
+    </body>
 </html>
