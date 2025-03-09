@@ -19,13 +19,13 @@ The app calculates the distance to the source
 
 ### Features
 
-🗺️ Interactive map with location search and geolocation
-🔄 Multiple measurements with color-coding for tracking different events
-💾 Remembers your position between visits
-📱 Works on both mobile and desktop
-🚫 No installation required - just a single HTML page
+- 🗺️ Interactive map with location search and geolocation
+- 🔄 Multiple measurements with color-coding for tracking different events
+- 💾 Remembers your position between visits
+- 📱 Works on both mobile and desktop
+- 🚫 No installation required - just a single HTML page
 
 ### Claude3.7
 
 The best use case that I found for these models is to quickly get these little prototypes and apps out of my mind and onto real code.
-They are a motor of getting these little things done, I like that. [My little chat with Claude](https://claude.ai/share/bab1e9f3-d447-4df1-9715-2bb65b3ad958)
+They are a motor of getting these little things done, I like that.
