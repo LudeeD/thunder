@@ -1,5 +1,8 @@
 # ⛈️ Thunder Distance Calculator
 
+![Screenshot 2025-03-09 at 19-39-39 Thunder Distance Calculator](https://github.com/user-attachments/assets/e0721f6c-5281-4b93-bc4e-e81a98950089)
+
+
 ### Why I Built This
 Working from my office, I often catch fireworks displays out of the corner of my eye. It always follows the same pattern:
 
